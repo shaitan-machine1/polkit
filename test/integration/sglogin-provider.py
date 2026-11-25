@@ -21,6 +21,7 @@ import dbus.service
 from gi.repository import GLib
 
 SID = "0123456789abcdef0123456789abcdef"
+OTHER_SID = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 SESSION = "org.SGLogin.Sessiond1"
 SEAT = "org.SGLogin.Multiseatd1.Seat_seat0"
 SI = SESSION + ".Manager"
@@ -52,11 +53,11 @@ class Session(dbus.service.Object):
         super().__init__(connection, "/org/SGLogin/Sessiond1")
         self.state = state
 
-    def info(self):
+    def info(self, sid=SID):
         self.state.queries += 1
         if self.state.mode == "absent":
             raise MissingSession("fixture session is unready or dead")
-        return SID, dbus.UInt32(1000), "/fixture/runtime/1000"
+        return sid, dbus.UInt32(1000), "/fixture/runtime/1000"
 
     @dbus.service.method(SI, in_signature="ut", out_signature="(sus)")
     def GetSessionByPid(self, pid, expected):
@@ -70,8 +71,8 @@ class Session(dbus.service.Object):
 
     @dbus.service.method(SI, in_signature="s", out_signature="(sus)")
     def GetSession(self, sid):
-        assert sid == SID
-        return self.info()
+        assert sid in (SID, OTHER_SID)
+        return self.info(str(sid))
 
     @dbus.service.method(SI, in_signature="s", out_signature="ut")
     def GetSessionMasterPid(self, sid):
@@ -216,6 +217,7 @@ def main():
             control = Control(connection, address)
             environment = os.environ.copy()
             environment["DBUS_SYSTEM_BUS_ADDRESS"] = address
+            environment.pop("POLKIT_SGLOGIN_FULL_POLICY", None)
             if args.action_dir is not None:
                 environment["POLKIT_SGLOGIN_FULL_POLICY"] = "1"
             # The caller's checkout may be private (e.g. a mode-0700 home).

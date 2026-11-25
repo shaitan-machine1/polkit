@@ -17,6 +17,7 @@
  * Boston, MA 02111-1307, USA.
  */
 #include "config.h"
+#include <string.h>
 #include <unistd.h>
 #include <polkit/polkit.h>
 #include <polkitbackend/polkitbackend.h>
@@ -24,6 +25,7 @@
 #include <polkitbackend/polkitbackendsessionmonitor.h>
 
 #define SID "0123456789abcdef0123456789abcdef"
+#define OTHER_SID "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 static GDBusConnection *bus;
 static guint changes;
 
@@ -401,8 +403,9 @@ unprivileged_client (void)
   GError *error = NULL;
   Permission permission = {0};
   PolkitBackendSessionMonitor *monitor;
-  PolkitSubject *subject, *session, *resolved;
+  PolkitSubject *subject, *session, *resolved, *other;
   PolkitIdentity *user;
+  PolkitAuthority *authority;
   gboolean matches = FALSE;
   g_assert_cmpint (getuid (), ==, 65534);
   bus = g_bus_get_sync (G_BUS_TYPE_SYSTEM, NULL, &error);
@@ -437,12 +440,34 @@ unprivileged_client (void)
       mode ("active");
       wait_allowed (permission.permission, TRUE);
       g_object_unref (permission.permission);
+      g_print ("Unprivileged PolkitPermission refresh acceptance passed\n");
     }
+  /* Two valid sessions with the same owning UID are not interchangeable agent
+   * scopes. The caller's actual process membership remains authoritative. */
+  authority = polkit_authority_get_sync (NULL, &error);
+  g_assert_no_error (error);
+  other = polkit_unix_session_new (OTHER_SID);
+  user = polkit_backend_session_monitor_get_user_for_subject (monitor, other, &matches, &error);
+  g_assert_no_error (error);
+  g_assert_cmpint (polkit_unix_user_get_uid (POLKIT_UNIX_USER (user)), ==, 1000);
+  g_object_unref (user);
+  g_assert_false (polkit_authority_register_authentication_agent_sync (
+                    authority, other, "C", "/org/example/OtherAgent", NULL, &error));
+  g_assert_nonnull (strstr (error->message, "Passed session and the session the caller is in differs"));
+  g_clear_error (&error);
+  mode ("absent");
+  g_assert_false (polkit_authority_register_authentication_agent_sync (
+                    authority, session, "C", "/org/example/OtherAgent", NULL, &error));
+  g_assert_nonnull (strstr (error->message, "Cannot determine session the caller is in"));
+  g_clear_error (&error);
+  mode ("active");
+  g_object_unref (other);
+  g_object_unref (authority);
   g_object_unref (session);
   g_object_unref (subject);
   g_object_unref (monitor);
   g_object_unref (bus);
-  g_print ("Unprivileged native provider/client and PolkitPermission acceptance passed\n");
+  g_print ("Unprivileged provider/client and agent-scope rejection acceptance passed\n");
   return 0;
 }
 
@@ -609,6 +634,9 @@ main (int argc, char **argv)
   g_object_unref (authority);
   g_object_unref (monitor);
   g_object_unref (bus);
-  g_print ("SGLogin independent getters, JS properties, policy, identity and monitor acceptance passed\n");
+  if (g_getenv ("POLKIT_SGLOGIN_FULL_POLICY") != NULL)
+    g_print ("SGLogin full policy, agent/retention, permission and provider acceptance passed\n");
+  else
+    g_print ("SGLogin basic provider acceptance passed (full action-policy fixtures not enabled)\n");
   return 0;
 }
