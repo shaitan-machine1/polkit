@@ -26,6 +26,9 @@
 #include "polkitbackendcommon.h"
 
 #include "duktape.h"
+#ifdef HAVE_SGLOGIN
+#include <sglogin/login.h>
+#endif
 
 /* Built source and not too big to worry about deduplication */
 #include "initjs.h" /* init.js */
@@ -379,7 +382,11 @@ push_subject (duk_context               *cx,
 {
   gboolean ret = FALSE;
   gboolean no_new_privs = FALSE;
+#ifdef HAVE_SGLOGIN
+  sgl_client *login_client = NULL;
+#else
   gint pidfd = -1;
+#endif
   pid_t pid_early, pid_late;
   uid_t uid;
   PolkitSubject *process = NULL;
@@ -418,7 +425,9 @@ push_subject (duk_context               *cx,
   duk_new (cx, 0);
 
   pid_early = polkit_unix_process_get_pid (POLKIT_UNIX_PROCESS (process));
+#ifndef HAVE_SGLOGIN
   pidfd = polkit_unix_process_get_pidfd (POLKIT_UNIX_PROCESS (process));
+#endif
 
 #ifdef HAVE_LIBSYSTEMD
 #if HAVE_SD_PIDFD_GET_SESSION
@@ -430,6 +439,20 @@ push_subject (duk_context               *cx,
   if (session_str)
     sd_session_get_seat (session_str, &seat_str);
 #endif /* HAVE_LIBSYSTEMD */
+#ifdef HAVE_SGLOGIN
+  {
+    int result = sgl_client_new (NULL, &login_client);
+    if (result == 0)
+      result = sgl_pid_get_session (login_client, pid_early,
+                                   polkit_unix_process_get_start_time (POLKIT_UNIX_PROCESS (process)),
+                                   &session_str);
+    if (result == 0)
+      result = sgl_session_get_seat (login_client, session_str, &seat_str);
+    if (result < 0 && result != -ENODATA && result != -ENOENT)
+      g_debug ("SGLogin JavaScript session/seat lookup failed: %s (%d)",
+               login_client ? sgl_client_last_error (login_client) : "no client", -result);
+  }
+#endif
 
   g_assert (POLKIT_IS_UNIX_USER (user_for_subject));
   uid = polkit_unix_user_get_uid (POLKIT_UNIX_USER (user_for_subject));
@@ -505,8 +528,10 @@ else
    * Best-effort operation, will log on failure, but we don't bail here. But
    * only do so if the pidfd was marked as safe, i.e.: we got it from D-Bus so
    * it can be trusted end-to-end, with no reuse attack window.  */
+#ifndef HAVE_SGLOGIN
   if (polkit_unix_process_get_pidfd_is_safe (POLKIT_UNIX_PROCESS (process)))
     polkit_backend_common_pidfd_to_systemd_unit (pidfd, &system_unit, &no_new_privs);
+#endif
 
   /* In case we are using PIDFDs, check that the PID still matches to avoid race
    * conditions and PID recycle attacks.
@@ -551,8 +576,14 @@ else
  out:
   if (POLKIT_IS_SYSTEM_BUS_NAME (subject) && process != NULL)
     g_object_unref (process);
+#ifdef HAVE_SGLOGIN
+  sgl_free (session_str);
+  sgl_free (seat_str);
+  sgl_client_free (login_client);
+#else
   free (session_str);
   free (seat_str);
+#endif
   free (system_unit);
   g_free (user_name);
   if (groups != NULL)

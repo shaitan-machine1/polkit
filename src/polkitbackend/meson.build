@@ -38,6 +38,9 @@ deps += thread_dep
 if enable_logind
   sources += files('polkitbackendsessionmonitor-systemd.c')
   deps += logind_dep
+elif enable_sglogin
+  sources += files('polkitbackendsessionmonitor-sglogin.c')
+  deps += sglogin_dep
 else
   sources += files('polkitbackendsessionmonitor.c')
 endif

@@ -11,7 +11,8 @@ Install the development headers and libraries for your selected configuration:
 - GLib, GObject, GIO, and GIO Unix >= 2.44.
 - Duktape >= 2.2.0 and Expat for the daemon.
 - PAM for the default `-Dauthfw=pam` configuration.
-- libsystemd for the default `-Dsession_tracking=logind`, or libelogind for `elogind`.
+- libsystemd for the default `-Dsession_tracking=logind`, libelogind for `elogind`,
+  or libsglogin >= 0.1.0 for `sglogin`.
 - GObject Introspection >= 0.6.2, enabled by default; disable with `-Dintrospection=false`.
 - Gettext tools for translating policy and service files.
 
@@ -68,6 +69,15 @@ meson compile -C builddir
 See [Testing](TESTING.md#running) for commands to run the test suite.
 Project-specific options are defined in [meson_options.txt](../meson_options.txt).
 The [architecture guide](ARCHITECTURE.md#meson-build-system) describes the build structure and targets.
+
+## SGLogin Session Tracking
+
+Build [lib-sglogin](https://github.com/shaitan-machine1/lib-sglogin) first and make
+its installed or staged `libsglogin.pc` available to pkg-config. Select the native
+provider with `-Dsession_tracking=sglogin`. Both the client library and daemon
+link libsglogin; no logind/elogind session provider or runtime fallback is used.
+The SGLogin daemons remain independently installed services, not bundled code.
+See [Testing](TESTING.md#sglogin-provider) for isolated provider validation.
 
 ## Fedora Package Configuration
 

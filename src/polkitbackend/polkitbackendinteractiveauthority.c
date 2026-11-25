@@ -304,11 +304,17 @@ on_name_owner_changed_signal (GDBusConnection *connection,
 
 /* ---------------------------------------------------------------------------------------------------- */
 
+#ifdef HAVE_SGLOGIN
+static void invalidate_closed_session_agents (PolkitBackendInteractiveAuthority *authority);
+#endif
 static void
 on_session_monitor_changed (PolkitBackendSessionMonitor *monitor,
                             gpointer                     user_data)
 {
   PolkitBackendInteractiveAuthority *authority = POLKIT_BACKEND_INTERACTIVE_AUTHORITY (user_data);
+#ifdef HAVE_SGLOGIN
+  invalidate_closed_session_agents (authority);
+#endif
   g_signal_emit_by_name (authority, "sessions-changed");
 }
 
@@ -1822,6 +1828,30 @@ authentication_agent_unref (AuthenticationAgent *agent)
       g_free (agent);
     }
 }
+
+#ifdef HAVE_SGLOGIN
+static void
+invalidate_closed_session_agents (PolkitBackendInteractiveAuthority *authority)
+{
+  PolkitBackendInteractiveAuthorityPrivate *priv = polkit_backend_interactive_authority_get_instance_private (authority);
+  GHashTableIter iter;
+  gpointer key, value;
+  g_hash_table_iter_init (&iter, priv->hash_scope_to_authentication_agent);
+  while (g_hash_table_iter_next (&iter, &key, &value))
+    {
+      PolkitSubject *scope = key;
+      AuthenticationAgent *agent = value;
+      GList *l;
+      /* Only session-scoped bindings are invalidated. Retained authorization
+       * and process-scoped agent policy remain owned by the existing paths. */
+      if (!POLKIT_IS_UNIX_SESSION (scope) || polkit_subject_exists_sync (scope, NULL, NULL))
+        continue;
+      for (l = agent->active_sessions; l != NULL; l = l->next)
+        authentication_session_cancel (l->data);
+      g_hash_table_iter_remove (&iter);
+    }
+}
+#endif
 
 static AuthenticationAgent *
 authentication_agent_new (guint64      serial,

@@ -197,7 +197,12 @@ endif
 
 # Select wether to use logind, elogind or ConsoleKit for session tracking
 session_tracking = get_option('session_tracking')
-enable_logind = (session_tracking != 'ConsoleKit')
+enable_logind = session_tracking in ['logind', 'elogind']
+enable_sglogin = session_tracking == 'sglogin'
+if enable_sglogin
+  sglogin_dep = dependency('libsglogin', version: '>=0.1.0', required: true)
+endif
+config_data.set('HAVE_SGLOGIN', enable_sglogin)
 if enable_logind
   if session_tracking == 'logind'
     logind_dep = dependency('libsystemd', not_found_message: 'logind support requested but libsystemd library not found')

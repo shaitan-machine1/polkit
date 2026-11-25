@@ -127,6 +127,33 @@ Use `--verbose` to see GLib test log output.
 
 ---
 
+## SGLogin Provider
+
+With `-Dsession_tracking=sglogin -Dtests=true`, Meson adds `sglogin-provider`.
+It returns 77 unless run as root: the disposable services must have root-owned
+bus names to exercise the provider's owner verification. The harness starts its
+own bus; it never uses installed services, PAM, devices or containment. It also
+executes provider/client queries as UID 65534 and tests non-root service spoofing.
+Python D-Bus, PyGObject and `dbus-daemon` are required.
+
+For full action-policy, scripted agent, retained-grant and client permission
+coverage, configure a separate build with its prefix and sysconfdir under a
+caller-chosen disposable `/tmp` tree. Create its empty
+`PREFIX/share/polkit-1/actions` directory, then run:
+
+```sh
+sudo -n python3 test/integration/sglogin-provider.py \
+  BUILD/test/polkitbackend/test-sglogin-provider \
+  --action-dir PREFIX/share/polkit-1/actions
+```
+
+The explicit action directory must be empty and under `/tmp`; the harness removes
+its fixture policy afterwards. Tests use controlled rules so distribution grants
+do not mask incorrect provider flags. Agent responses are scripted protocol
+fixtures, not acceptance of real password authentication. No operator secret,
+setuid helper, installed policy or live installation is involved. A normal-user
+Meson run still reports the root provider test as skipped, not passed.
+
 ## Integration Tests
 
 Located in `test/integration/`, using TMT (Test Management Tool) with FMF metadata:

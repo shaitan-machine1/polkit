@@ -1,0 +1,19 @@
+polkit.addRule(function(action, subject) {
+    if (action.id !== "org.example.sglogin.facts")
+        return null;
+    if (subject.session === action.lookup("session") &&
+        subject.seat === (action.lookup("seat") || null) &&
+        subject.local === (action.lookup("local") === "true") &&
+        subject.active === (action.lookup("active") === "true"))
+        return polkit.Result.YES;
+    return polkit.Result.NO;
+});
+polkit.addAdminRule(function(action, subject) {
+    if (action.id === "org.example.sglogin.facts" &&
+        subject.session === action.lookup("session") &&
+        subject.seat === (action.lookup("seat") || null) &&
+        subject.local === (action.lookup("local") === "true") &&
+        subject.active === (action.lookup("active") === "true"))
+        return ["unix-user:1000"];
+    return ["unix-user:root"];
+});

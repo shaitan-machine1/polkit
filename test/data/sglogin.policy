@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN" "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <action id="org.example.sglogin.implicit">
+    <description>Disposable SGLogin implicit policy test</description>
+    <message>Test authentication</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>auth_self</allow_inactive><allow_active>yes</allow_active></defaults>
+  </action>
+  <action id="org.example.sglogin.facts">
+    <description>Disposable SGLogin JavaScript facts test</description>
+    <message>Test authentication</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>no</allow_active></defaults>
+  </action>
+  <action id="org.example.sglogin.challenge">
+    <description>Disposable SGLogin scripted challenge</description>
+    <message>Fixture authentication</message>
+    <defaults><allow_any>auth_self</allow_any><allow_inactive>auth_self</allow_inactive><allow_active>auth_self</allow_active></defaults>
+  </action>
+  <action id="org.example.sglogin.keep">
+    <description>Disposable SGLogin retained authorization</description>
+    <message>Fixture authentication</message>
+    <defaults><allow_any>auth_self_keep</allow_any><allow_inactive>auth_self_keep</allow_inactive><allow_active>auth_self_keep</allow_active></defaults>
+  </action>
+</policyconfig>

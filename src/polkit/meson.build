@@ -81,6 +81,9 @@ if enable_logind
   sources += 'polkitunixsession-systemd.c'
 
   deps += logind_dep
+elif enable_sglogin
+  sources += 'polkitunixsession-sglogin.c'
+  deps += sglogin_dep
 else
   sources += 'polkitunixsession.c'
 endif
